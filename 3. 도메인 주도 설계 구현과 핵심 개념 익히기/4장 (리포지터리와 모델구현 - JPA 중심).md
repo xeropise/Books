@@ -831,3 +831,220 @@ public class Image {
 
 
 
+<br>
+
+
+
+***
+
+### ID 참조와 조인 테이블을 이용한 단방향 M:N 매핑
+
+- 애그리거트 간 집합 연관은 성능상의 이유로 피해야 한다고 했으나 요구사항을 구현하는 데 집합 연관을 사용하는 것이 유리하다면?
+  - ID 참조를 이용한 단방향 집합 연관을 적용해 볼 수 있다.
+
+```java
+@Entity
+@Table(name = "product")
+public class Product {
+  @EmbeddedId
+  private ProductId id;
+  
+  // 단방향 M:N 연관을 ID 참조 방식으로
+  @ElementCollection
+  @CollectionTable(name = "product_category",
+                  joinColumns = @joinColumn(name = "product_id"))
+  private Set<CategoryId> categoryIds;
+  ...
+}
+```
+
+
+
+- @ElementCollection 을 이요하기 때문에 Product 를 삭제할 때 매핑에 사용한 조인 테이블의 데이터도 함께 삭제 된다.
+  - 애그리거트를 직접 참조하는 방식을 사용했다면 영속성 전파나 로딩 전략을 고민해야 하지만, ID 참조 방식을 사용함으로써 고민할 필요가 없다.
+
+
+
+<br> 
+
+***
+
+### 애그리거트 로딩 전략
+
+- JPA 매핑을 설정할 때 항상 기억해야 할 점은 애그리거트에 속한 객체가 모두 모여야 완전한 하나가 된다는 것이다.
+
+  
+
+- 애그리거트 루트를 로딩하면 루트에 속한 모든 객체가 완전한 상태여야 함을 의미
+
+```java
+// product는 완전한 하나여야 한다.
+Product product = productRepository.findById(id);
+```
+
+
+
+- 조회 시점에서 애그리거트를 완전한 상태가 되도록 하려면?
+
+  - 애그리거트 루트에서 연관 매핑의 조회 방식을 즉시 로딩으로 설정하면 된다. (fetch = FetchType.EAGER)
+
+    
+
+- 즉시 로딩 방식으로 설정하면 애그리거트 루트를 로딩하는 시점에 애그리거트에 속한 모든 객체를 함께 로딩할 수 있는 장점이 있지만, 이 장점이 항상 좋은것은 아니다.
+
+  - 컬렉션에 대해 로딩전략을 설정하면, 오히려 즉시 로딩 방식이 문제 될 수 있다. 카타시안 조인을 이용하므로 카타시안 곱 문제 발생 (중복 발생)
+
+    
+
+- 애그리거트는 개념적으로 하나여야 하지만 루트 엔티티를 로딩하는 시점에 애그리거트에 속한 객체를 모두 로딩해야 하는 것은 아님
+
+  
+
+- 애그리거트가 완전해야 하는 이유?
+
+  - 상태를 변경하는 기능을 실행할 때 애그리거트 상태가 완전해야함
+
+    - 조회 시점에 즉시 로딩을 이용해서 애그리거트를 완전한 상태로 로딩할 필요는 없음
+
+      
+
+    - JPA는 트랜잭션 범위 내에서 지연 로딩을 허용하기 때문에 실제로 상태를 변경하는 시점에 필요한 구성 요소만 로딩해도 문제가 되지 않는다.
+
+    ```java
+    @Transactional
+    public void removeOptions(ProductId id, int optidxTobeDeleted) {
+      // Product를 로딩, 컬렉션은 지연 로딩으로 설정했다면, Option은 로딩하지 않음
+      Product product = productRepository.findById(id);
+      
+      // 트랜잭션 범위이므로 지연 로딩으로 설정한 연관 로딩 가능
+      product.removeOption(optidxTobeDeleted);
+    }
+    
+    ///////////////////////////////////////////////
+    
+    @Entity
+    public class Product {
+      
+      @ElementCollection(fetch = FetchType.LAZY)
+      @CollectionTable(name = "product_option",
+                      joinColumns = @JoinColumn(name = "product_id"))
+      @OrderColumn(name = "list_idx")
+      private List<Option> options = new ArrayList<>();
+      
+      public void removeOption(int optIdx) {
+        // 실제 컬렉션에 접근할 때 로딩
+        this.options.remove(optIdx);
+      }
+    }
+    ```
+
+    
+
+    - 애플리케이션의 상태를 변경하는 기능보다 조회하는 기능이 빈도가 훨씬 높음
+      - 상태 변경을 위해 지연로딩을 사용할 때 발생하는 추가 쿼리로 인한 실행 속도 저하는 문제가 되지 않음
+
+    
+
+  - 표현 영역에서 애그리거트의 상태 정보를 보여줄 때 필요하기 때문
+
+    - 별도의 조회 전용 기능을 구현하는 방식을 사용하는 것이 매우 유리함
+
+
+
+<br> 
+
+***
+
+### 애그리거트의 영속성 전파
+
+- 애그리거트가 완전한 상태여야 한다는 것은 애그리거트 루트를 조회할 때뿐만 아니라 저장하고 삭제할 때도 하나로 처리해야 함을 의미
+
+  - 저장 하는 경우, 애그리거트에 속한 모든 객체를 저장
+
+  - 삭제 하는 경우, 애그리거트 루트 뿐만 아니라 애그리거트에 속한 모든 객체 삭제
+
+    
+
+- @Embeddable 매핑 타입의 경우, 함께 저장되고 삭제되므로 cascade 속성을 추가로 설정하지 않아도 된다.
+
+  
+
+- 애그리거트에 속한 @Entity 타입에 대한 매핑은 cascade 속성을 사용해서 저장과 삭제 시에 함께 처리되도록 설정해야 한다.
+
+```java
+@OneToMany(cascade = {CacadeType.PERSIST, CascadeType.REMOVE},
+          orphanRemoval = true))  // @OneToOne, @OneToMany 는 cascadeType의 기본값이 없다.
+@JoinColumn(name = "product_id")  
+@OrderColumn(name = "list_idx")  
+private List<Image> images = new ArrayList<>();
+```
+
+
+
+<br> 
+
+***
+
+### 식별자 생성 기능
+
+- 식별자의 생성 방법은 3가지가 있다. 
+
+  - 사용자가 직접 생성
+
+    - 도메인 영역에 식별자 생성 기능을 구현할 필요가 없다.
+
+      
+
+  - 도메인 로직으로 생성
+
+    - 식별자 생성 규칙이 있는 경우, 엔티티를 생성할 때 이미 생성한 식별자를 전달
+
+      
+
+    - 식별자 생성 규칙을 구현하기 적합한 곳은 도메인 말고도 리포지터리가 있음
+
+      
+
+  - DB를 이용한 일련번호 사용
+
+    - @GeneratedValue 를 사용하여 식별자 생성에 사용할 수 있다.
+
+      
+
+    - DB의 insert 쿼리를 실행해야 식별자가 생성되므로 도메인 객체를 리포지터리에 저장할 때 식별자가 생성된다.
+
+      - 도메인 객체를 생성하는 시점에는 식별자를 알 수 없고, 도메인 객체를 저장한 뒤에 식별자를 구할 수 있다.
+
+        
+
+  ```java
+  @Entity
+  @Table(name = "article")
+  ..
+  public class Article {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    public Long getId() {
+      return id;
+    }
+  }  
+  
+  /////////////////////////////
+  
+  public class WriteArticleService {
+    private ArticelRepository articleRepository;
+    
+    public Long write(NewArticleRequest req) {
+      Articel article = new Article("제목", new ArticelContent("content", "type"));
+      articleRepository.save(article); // EntityManager#save()
+      																 // 실행 시점에 식별자 생성
+      return article.getId();					// 저장 이후 식별자 사용 가능
+    }
+  }
+  ```
+
+  
+
+  
