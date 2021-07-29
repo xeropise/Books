@@ -542,3 +542,292 @@ private EmailSet emailSet;
 
 ***
 
+### 밸류를 이용한 아이디 매핑
+
+- 기본 타입을 사용하는 것이 나쁘진 않지만 식별자라는 의미를 부각시키기 위해 식별자 자체를 별도 밸류 타입으로 만들 수 있다.
+
+  
+
+- @EmbeddedId 어노테이션을 사용하여 밸류 타입을 식별자로 매핑할 수 있다.
+
+  - JPA에서 식별자 타입은 Serializable 타입이어야 하므로, 식별자로 사용될 밸류 타입은 Serializable 인터페이스를 상속 받아야 한다.
+
+```java
+@Entity
+@Table(name = "purchaes_order")
+public class Order {
+  @EmbeddedId
+  private OrderNo number;
+  ...
+}
+
+@Embeddable
+public class OrderNo implements Serializable {
+  @Column(name="order_number")
+  private String number;
+  ...
+}
+```
+
+
+
+- 밸류 타입으로 식별자를 구현할 때 얻을 수 잇는 장점은 식별자에 기능을 추가할 수 있다는 점이다.
+
+```java
+@Embeddable
+public class OrderNo implements Serializable {
+  @Column(name="order_number")
+  private String number;
+  
+  public boolean is2ndGeneration() {
+    return number.starsWith("W")
+  }
+}
+```
+
+
+
+<br> 
+
+***
+
+### 별도 테이블에 저장하는 밸류 매핑
+
+- 애그리거트에서 루트 엔티티를 뺀 나머지 구성요소는 대부분 밸류
+
+  
+
+- 루트 엔티티 외에 또 다른 엔티티가 있다면 진짜 엔티티인지 의심해봐야 한다.
+
+  
+
+- 단지 별도 테이블에 데이터를 저장한다고 해서 엔티티인 것은 아니다.
+
+  
+
+- 밸류가 아니라 엔티티가 확실한다면 다른 애그리거트는 아닌지 확인해야 한다.
+
+  - 자신만의 독자적인 라이프사이클을 갖는다면 , 다른 애그리거트일 가능성이 높다. 
+
+    - (상품과 고객 리뷰,  함께 생성되지도 않고, 함께 변경되지도 않는다. 하지만 화면에 같이 있을 수 있다.)
+
+      
+
+- 애그리거트에 속한 객체가 밸류인지 엔티티인지 구분하는 방법 
+
+  - 고유 식별자는 갖는지 여부를 확인하는 것
+
+    - 식별자를 찾을 때 매핑되는 테이블의 식별자를 애그리거트의 구성요소의 식별자와 동일한 것으로 착각하면 안됨.
+
+      
+
+    - 별도 테이블로 저장되고 테이블에 PK가 있다고 해서 테이블과 매핑되는 애그리거트 구성요소가 고유 식별자를 갖는 것은 아니다.
+
+      - Article, ArticleContent  두 테이블이 있고 각각 ID 를 가지고 있다고 생각해서 엔티티 간 일대일 연관으로 매핑하는 실수
+
+        
+
+      - ArticleContent를 엔티티로 생각할 수 있지만 ArticleContent는 Article 의 내용을 담고 있는 밸류
+
+        
+
+      - ArticleContent 밸류이므로 @Embeddable로 매핑하고,  ArticleContet 와 매핑되는 테이블은 Article 과 매핑되는 테이블과 다르므로, 밸류를 매핑한 테이블을 지정하기 위해 @SecondaryTable 과 @AttributeOverride 를 사용하면 된다.
+
+```java
+import javax.persistence.*;
+
+@Entity
+@Table(name = "article")
+@SecondaryTable(
+		name = "article_content",
+  	pkJoinColumns = @PrimaryKeyJoinColumn(name = "id")
+)
+public class Article {
+  @Id
+  private Long id;
+  private String title;
+  ...
+  @AttributeOverride({
+    @AttributeOverride(name = "content", column = @Column(table = "article_content")),
+    @AttributeOverride(name = "contentType", column = @Column(table = "article_content"))
+  })
+  private ArticleContent content;
+  ...
+}
+
+//////////////////////////////////////
+
+// @SecondaryTable 로 매핑된 article_content 테이블을 조인
+// 조인해서 가져오므로 원하지 않는 데이터를 가져올 수도 있으므로, 조회 전용 기능이나 지연 로딩 방식을 사용할 수 있다.
+Article article = entityManager.find(Article.class, 1L);
+```
+
+
+
+<br> 
+
+***
+
+### 밸류 컬렉션을 @Entity 로 매핑하기
+
+- 개념적으로 밸류인데 구현 기술의 한계나 팀 표준 때문에 @Entity 를 사용해야 할 때가 있다.
+
+  
+
+- JPA는 @Embeddable 타입의 클래스 상속 매핑을 지원하지 않으므로, 상속 구조를 갖는 밸류 타입을 사용하려면 @Embeddable  대신  @Entity를 이용한 상속 매핑으로 처리해야 한다. 
+
+  
+
+- 밸류 타입을 @Entity 로 매핑하므로 식별자 매핑을 위한 필드도 추가해야 한다. 또, 구현 클래스를 구분하기 위한 타입 식별(discriminator) 컬럼을 추가해야 한다.
+
+  
+
+- 제품의 이미지 업로드 방식에 따라 이미지 경로와 썸네일 이미지 제공 여부가 달라져  Image 밸류타입을 상속해야 하는 InternalImage, ExternalImage 가 있다고 하자.
+
+  - 한 테이블에 Image 및 하위 클래스를 매핑하므로  Image 클래스에 @Inheritance 를 적용
+
+    
+
+  - strategy 값으로 SINGLE_TABLE 을 사용
+
+    
+
+  - @DiscriminatorColumn 을 이용해서 타입을 구분하는 용도로 사용할 컬럼을 지정 한다.
+
+```java
+import javax.persistence.*;
+import java.util.Date;
+
+@Entity
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "image_type")
+@Table(name = "image")
+public abstract class Image {
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  @Column(name = "image_id")
+  private Long id;
+  
+  @Column(name = "image_path")
+  private String path;
+  
+  @Temporal(TemporalType.TIMESTAMP)
+  @Column(name = "upload_time")
+  private Date uploadTIme;
+  
+  protected Image() {}
+  
+  public Image(String path) {
+    this.path = path;
+    this.uploadTime = new Date();
+  }
+  
+  protected String getPath() {
+    return path;
+  }
+  
+  public Date getUploadTime() {
+    return uploadTime;
+  }
+  
+  public abstract String getURL();
+  public abstract boolean hasThumbnail();
+  public abstract String getThumbnailURL();
+  
+}
+```
+
+
+
+- Image 를 상속받은 클래스는 다음과 같이 @Entity 와 @Discriminator 를 사용해서 매핑을 설정한다.
+
+```java
+@Entity
+@DiscriminatorValue("II")
+public class InternalImage extends Image {
+  ...
+}
+
+@Entity
+@DiscriminatorValue("EI")
+public class ExternalImage extends Image {
+  ...
+}
+```
+
+
+
+- Image 가 @Entity 이므로 목록을 담고 있는 Product 와 같이 @OneTo-Many 를 이용해서 매핑을 처리한다.
+
+  - 단, 밸류이므로 독자적인 라이프사이클을 갖지 않고, Product 에 완전히 의존한다.
+
+    
+
+  - casecade 속성을 사용해서 Product를 저장할 때, 함께 저장되고, 삭제할 때 함께 삭제되도록 설정한다. 리스트에서  Image 객체를 제거하면 DB에서 함께 삭제되도록 orphanRemoval 도 true 로 설정한다.
+
+```java
+@Entity
+@Table(name = "product")
+public class Product {
+  @EmbeddedId
+  private ProductId id;
+  private String name;
+  
+  @Convert(converte = MoneyConverter.class)
+  private Money price;
+  
+  private String detail;
+  
+  @OneToMany(cascade = {CascadeType.PERSIST, CascadeType.REMOVE}
+            , orphanRemoval = true)
+  @JoinColumn(name = "product_id")
+  @OrderColumn(name = "list_idx")
+  private List<Image> images = new ArrayList<>();
+  
+  ...
+    
+  public void changeImages(List<Image> newImage) {
+    images.clear(); // select 쿼리로 대상 엔티티를 로딩하고, 각 개별 엔티티에 대해 delete 쿼리를 실행하므로 성능에 문제가 될 수 있다.
+    images.addAll(newImages);
+  }  
+    
+}
+```
+
+
+
+- 하이버네이트는 @Embeddable 타입에 대한 컬렉션의 clear() 메소드를 호출하면 컬렉션에 속한 객체를 로딩하지 않고, 한 번의 delete 쿼리로 삭제 처리를 수행하므로, 애그리거트의 특성을 유지하면서 문제를 해소하려면 결국 상속을 포기해야한다.
+
+  
+
+- @Embeddable 로 매핑된 단일 클래스로 구현해야 한다. 물론, 이 경우 타입에 따라 다른 기능을 구현하려면 if-else 로 구현해야 한다.
+
+  - 코드 유지보수와 성능의 두 가지 측면을 고려해서 구현 방식을 선택해야 한다.
+
+~~~java
+@Embeddable
+public class Image {
+  @Column(name = "image_type")
+  private String imageType;
+  
+  @Column(name = "image_path")
+  private String imagePath;
+  
+  @Temporal(TemporalType.TIMESTAMP)
+  @Column(name = "upload_time")
+  private Date uploadTime;
+  ...
+    
+  public boolean hasThumbnail() {
+    // 성능을 위해 다형을 포기하고 if-else 로 구현
+    if ("II".equals(imageType)){
+      return true;
+    } else {
+      return false;
+    }
+  }
+}
+~~~
+
+
+
