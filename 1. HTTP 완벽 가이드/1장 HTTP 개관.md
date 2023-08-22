@@ -6,7 +6,8 @@
 
 ### 1.1 HTTP란?
 
-### ![fetching_a_page](C:\Users\whrbq\OneDrive\바탕 화면\fetching_a_page.png)
+### ![fetching_a_page](![fetching_a_page](https://github.com/xeropise/read-book/assets/50399804/876af139-b135-4d18-a1a7-e69c77b794d8)
+)
 
 - 전 세계의 웹 브라우저, 서버 , 웹 애플리케이션은 모두 HTTP (HyperText Transfer Protocol) 을 통해 서로 대화한다.
 
@@ -187,7 +188,7 @@ http://www.joes-hardware.com/specials/saw-blade.gif
 
 ### 1.5 메시지
 
-![httpmsgstructure2](C:\Users\whrbq\OneDrive\바탕 화면\httpmsgstructure2.png)
+![httpmsgstructure2](https://github.com/xeropise/read-book/assets/50399804/b96c93c3-5a84-4627-ae11-4fc24993074c)
 
 - 시작 줄 (Start line)
   - 메시지의 첫 줄은 시작줄로, 요청이라면 무엇을 해야 하는지 응답이라면 무슨일이 있어났는지 나타난다.
@@ -230,12 +231,10 @@ http://www.joes-hardware.com/specials/saw-blade.gif
 
   - 조각나지 안는 데이터 스트림
 
-    
-
+  
 - TCP/IP는 TCP와 IP가 층을 이루는 패킷 교환 네트워크 프로토콜의 집합이다.
 
-![Screen Shot 2022-02-10 at 2.12.25 PM](C:\Users\whrbq\OneDrive\바탕 화면\Screen Shot 2022-02-10 at 2.12.25 PM.png)
-
+<img width="309" alt="Screen Shot 2022-02-10 at 2 12 25 PM" src="https://github.com/xeropise/read-book/assets/50399804/56b3022d-efc9-4a31-bf92-cdd4c92abdb8">
 
 
 #### 1.6.2 접속, IP 주소 그리고 포트 번호
