@@ -6,8 +6,8 @@
 
 ### 1.1 HTTP란?
 
-### ![fetching_a_page](![fetching_a_page](https://github.com/xeropise/read-book/assets/50399804/876af139-b135-4d18-a1a7-e69c77b794d8)
-)
+### ![fetching_a_page](https://github.com/xeropise/read-book/assets/50399804/876af139-b135-4d18-a1a7-e69c77b794d8)
+
 
 - 전 세계의 웹 브라우저, 서버 , 웹 애플리케이션은 모두 HTTP (HyperText Transfer Protocol) 을 통해 서로 대화한다.
 
