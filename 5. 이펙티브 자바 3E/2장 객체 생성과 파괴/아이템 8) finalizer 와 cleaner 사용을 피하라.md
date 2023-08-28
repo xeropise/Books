@@ -17,7 +17,7 @@ protected void finalize() throws Throwable { }
 > cleaner
 
 ```java
-ublic class CleaningRequiredObject implements AutoCloseable {
+public class CleaningRequiredObject implements AutoCloseable {
 
     private static final Cleaner cleaner = Cleaner.create​();
 
